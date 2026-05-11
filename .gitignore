@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# Weights & outputs
+output/
+output_dir/
+outputs/
+wandb/
+models/
+checkpoints/
+_ref_cache/
+fid_stats/
+sampled_images/
+*.pth
+*.ckpt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

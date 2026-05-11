@@ -1,0 +1,14 @@
+torch==2.6.0
+torchvision==0.21.0
+timm==1.0.24
+numpy==1.25.2
+einops==0.8.1
+scipy
+tqdm
+opencv-python-headless
+tensorboard
+wandb
+gdown
+transformers==4.57.3
+huggingface_hub
+-e git+https://github.com/LTH14/torch-fidelity.git@master#egg=torch-fidelity
