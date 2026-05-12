@@ -53,10 +53,10 @@ parameters. All FIDs use 25 Heun steps with the time-shift schedule.
 | REPA-XL                      | SD-VAE            |  675M  | 5.78              | 1.29                |
 | DDT-XL                       | SD-VAE            |  675M  | 6.27              | 1.26                |
 | REG-XL                       | SD-VAE            |  675M  | 1.80              | 1.36                |
-| RAE-XL                       | RAE-DINOv2-S      |  676M  | 1.87              | 1.41                |
-| RAE-XL<sup>DH</sup>          | RAE-DINOv2-B      |  839M  | 1.51              | 1.16                |
+| RAE-XL                       | DINOv2-S          |  676M  | 1.87              | 1.41                |
+| RAE-XL<sup>DH</sup>          | DINOv2-B          |  839M  | 1.51              | 1.16                |
 | FAE-XL                       | FAE-DINOv2-G      |  675M  | 1.48              | 1.29                |
-| **RiT-XL (ours)**            | **RAE-DINOv2-S**  | **676M** | **1.45**        | **1.14**            |
+| **RiT-XL (ours)**            | **DINOv2-S**      | **676M** | **1.45**        | **1.14**            |
 
 **Convergence is ~7× faster than RAE at matched encoder.** RiT-XL matches RAE's
 800-epoch FID within ~100 epochs.
