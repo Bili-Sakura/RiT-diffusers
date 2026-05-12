@@ -172,6 +172,16 @@ CKPT=output/my_run/checkpoint-last.pth bash scripts/eval.sh
 >     bash scripts/eval.sh
 > ```
 
+> **Wandb.** Both `train.sh` and `eval.sh` set `WANDB_MODE=disabled` by
+> default so the scripts run out of the box without any wandb account setup.
+> FID / IS / Precision / Recall are printed to stdout and appended to
+> `${OUTPUT_DIR}/fid_results.txt` regardless. To log a run to wandb instead,
+> override before invoking:
+> ```bash
+> export WANDB_MODE=online WANDB_API_KEY=... WANDB_PROJECT=RiT
+> bash scripts/train.sh
+> ```
+
 Reports FID / IS / Precision / Recall via [torch-fidelity](https://github.com/LTH14/torch-fidelity).
 
 ### Reconstruction demo

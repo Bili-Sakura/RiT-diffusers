@@ -36,7 +36,7 @@ def train_one_epoch(model, model_without_ddp, rae_model, data_loader, optimizer,
 
     optimizer.zero_grad()
 
-    if log_writer is not None:
+    if log_writer:
         print(f'log_dir: {args.output_dir}')
 
     for data_iter_step, (x, labels) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
@@ -79,7 +79,7 @@ def train_one_epoch(model, model_without_ddp, rae_model, data_loader, optimizer,
             loss_value_reduce = misc.all_reduce_mean(loss_value)
             loss_dict_reduced = misc.reduce_dict(loss_dict)
             grad_norm_reduce  = misc.all_reduce_mean(grad_norm)
-            if log_writer is not None and misc.is_main_process():
+            if log_writer and misc.is_main_process():
                 epoch_1000x = int(progress * 1000)
                 log_data = {
                     'lr': lr,
@@ -184,19 +184,23 @@ def evaluate(model_without_ddp, rae_model, args, epoch, batch_size=64, log_write
     else:
         raise NotImplementedError
 
-    if log_writer is not None:
-        image_files = sorted(os.listdir(save_folder))[:50]
-        print(f"[eval] save_folder={save_folder}, total files={len(os.listdir(save_folder))}, wandb sample={len(image_files)}")
-        wandb_images = []
-        for img_file in image_files:
-            img_path = os.path.join(save_folder, img_file)
-            img = cv2.imread(img_path)
-            if img is None:
-                print(f"[eval] WARNING: cv2.imread failed for {img_path}, skipping")
-                continue
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            wandb_images.append(wandb.Image(img, caption=img_file))
-        wandb.log({"generated_images": wandb_images, "epoch": epoch})
+    # FID / IS / Precision / Recall: only rank 0 computes (serial). `log_writer`
+    # controls wandb logging only — it does NOT gate the metrics themselves.
+    wandb_on = bool(log_writer)
+    if local_rank == 0:
+        if wandb_on:
+            image_files = sorted(os.listdir(save_folder))[:50]
+            print(f"[eval] save_folder={save_folder}, total files={len(os.listdir(save_folder))}, wandb sample={len(image_files)}")
+            wandb_images = []
+            for img_file in image_files:
+                img_path = os.path.join(save_folder, img_file)
+                img = cv2.imread(img_path)
+                if img is None:
+                    print(f"[eval] WARNING: cv2.imread failed for {img_path}, skipping")
+                    continue
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                wandb_images.append(wandb.Image(img, caption=img_file))
+            wandb.log({"generated_images": wandb_images, "epoch": epoch})
 
         print("Calculating FID and Inception Score...")
         n_images = len(os.listdir(save_folder))
@@ -241,7 +245,7 @@ def evaluate(model_without_ddp, rae_model, args, epoch, batch_size=64, log_write
         )
         precision = prc_dict['precision']
         recall    = prc_dict['recall']
-        _log_metrics(fid, inception_score, precision, recall, model_without_ddp, args, epoch, log_writer)
+        _log_metrics(fid, inception_score, precision, recall, model_without_ddp, args, epoch, wandb_on)
 
     torch.distributed.barrier()
     if local_rank == 0:
@@ -249,15 +253,16 @@ def evaluate(model_without_ddp, rae_model, args, epoch, batch_size=64, log_write
     torch.distributed.barrier()
 
 
-def _log_metrics(fid, inception_score, precision, recall, model_without_ddp, args, epoch, log_writer):
+def _log_metrics(fid, inception_score, precision, recall, model_without_ddp, args, epoch, wandb_on):
     postfix = f"_cfg{model_without_ddp.cfg_scale}_res{args.img_size}"
-    wandb.log({
-        f'fid{postfix}': fid,
-        f'is{postfix}': inception_score,
-        f'precision{postfix}': precision,
-        f'recall{postfix}': recall,
-        'epoch': epoch,
-    })
+    if wandb_on:
+        wandb.log({
+            f'fid{postfix}': fid,
+            f'is{postfix}': inception_score,
+            f'precision{postfix}': precision,
+            f'recall{postfix}': recall,
+            'epoch': epoch,
+        })
     print(f"FID: {fid:.4f}, Inception Score: {inception_score:.4f}, "
           f"Precision: {precision:.4f}, Recall: {recall:.4f}")
 

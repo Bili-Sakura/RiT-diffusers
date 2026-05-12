@@ -12,6 +12,11 @@ set -ex
 OUTPUT_DIR=${OUTPUT_DIR:-output/rit_xl_dinov2s}
 IMAGENET_PATH=${IMAGENET_PATH:-imagenet/}
 
+# wandb is disabled by default so the script runs out of the box without any
+# account setup. For long training runs you probably want it enabled:
+#   export WANDB_MODE=online  WANDB_API_KEY=...  WANDB_PROJECT=RiT
+export WANDB_MODE=${WANDB_MODE:-disabled}
+
 TORCHRUN=${TORCHRUN:-$(command -v torchrun || echo torchrun)}
 if [ -z "${PYTHON}" ]; then
     candidate="$(dirname "${TORCHRUN}")/python"

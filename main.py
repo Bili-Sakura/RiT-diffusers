@@ -180,18 +180,25 @@ def main(args):
     if global_rank == 0 and args.output_dir is not None:
         os.makedirs(args.output_dir, exist_ok=True)
         print("Logging to:", args.output_dir)
-        wandb.init(
-            project=os.environ.get("WANDB_PROJECT", "RiT"),
-            config=vars(args),
-            dir=args.output_dir,
-        )
-        wandb.define_metric("epoch_1000x")
-        wandb.define_metric("train_*", step_metric="epoch_1000x")
-        wandb.define_metric("lr", step_metric="epoch_1000x")
-        wandb.define_metric("grad_norm", step_metric="epoch_1000x")
-        wandb.define_metric("fid*", step_metric="epoch")
-        wandb.define_metric("is*", step_metric="epoch")
-        log_writer = True
+        # wandb is optional. Disable via `WANDB_MODE=disabled` (or `offline` for
+        # local-only logs). If init fails for any reason (no creds, no network),
+        # fall back to stdout/file logging so DDP init isn't blocked.
+        try:
+            wandb.init(
+                project=os.environ.get("WANDB_PROJECT", "RiT"),
+                config=vars(args),
+                dir=args.output_dir,
+            )
+            wandb.define_metric("epoch_1000x")
+            wandb.define_metric("train_*", step_metric="epoch_1000x")
+            wandb.define_metric("lr", step_metric="epoch_1000x")
+            wandb.define_metric("grad_norm", step_metric="epoch_1000x")
+            wandb.define_metric("fid*", step_metric="epoch")
+            wandb.define_metric("is*", step_metric="epoch")
+            log_writer = True
+        except Exception as e:
+            print(f"[wandb] init failed ({type(e).__name__}: {e}); continuing without wandb.")
+            log_writer = False
         with open(os.path.join(args.output_dir, 'args.json'), 'w') as f:
             json.dump(vars(args), f, indent=4)
     else:

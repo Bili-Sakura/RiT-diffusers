@@ -20,6 +20,12 @@ IMAGENET_PATH=${IMAGENET_PATH:-imagenet/}
 CFG=${CFG:-3.7}
 NUM_STEPS=${NUM_STEPS:-25}
 
+# wandb is disabled by default — eval is a one-shot run and wandb.init()
+# would otherwise hang on rank 0 while it waits for a login token. To log
+# this eval to a wandb project instead, do:
+#   export WANDB_MODE=online  WANDB_API_KEY=...  WANDB_PROJECT=RiT
+export WANDB_MODE=${WANDB_MODE:-disabled}
+
 # Resolve interpreters: prefer the active venv's python/torchrun, else fall
 # back to whatever is on PATH. If PYTHON is unset but TORCHRUN was resolved,
 # derive PYTHON from the same bin/ — this avoids the common case where
