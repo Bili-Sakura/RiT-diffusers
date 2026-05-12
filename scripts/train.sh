@@ -12,8 +12,15 @@ set -ex
 OUTPUT_DIR=${OUTPUT_DIR:-output/rit_xl_dinov2s}
 IMAGENET_PATH=${IMAGENET_PATH:-imagenet/}
 
-PYTHON=${PYTHON:-$(command -v python || command -v python3)}
 TORCHRUN=${TORCHRUN:-$(command -v torchrun || echo torchrun)}
+if [ -z "${PYTHON}" ]; then
+    candidate="$(dirname "${TORCHRUN}")/python"
+    if [ -x "${candidate}" ]; then
+        PYTHON="${candidate}"
+    else
+        PYTHON=$(command -v python || command -v python3)
+    fi
+fi
 echo "Using PYTHON=${PYTHON}"
 echo "Using TORCHRUN=${TORCHRUN}"
 

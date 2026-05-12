@@ -21,9 +21,19 @@ CFG=${CFG:-3.7}
 NUM_STEPS=${NUM_STEPS:-25}
 
 # Resolve interpreters: prefer the active venv's python/torchrun, else fall
-# back to whatever is on PATH.
-PYTHON=${PYTHON:-$(command -v python || command -v python3)}
+# back to whatever is on PATH. If PYTHON is unset but TORCHRUN was resolved,
+# derive PYTHON from the same bin/ — this avoids the common case where
+# `torchrun` lives in a conda env that has torch but the default `python`
+# points elsewhere.
 TORCHRUN=${TORCHRUN:-$(command -v torchrun || echo torchrun)}
+if [ -z "${PYTHON}" ]; then
+    candidate="$(dirname "${TORCHRUN}")/python"
+    if [ -x "${candidate}" ]; then
+        PYTHON="${candidate}"
+    else
+        PYTHON=$(command -v python || command -v python3)
+    fi
+fi
 echo "Using PYTHON=${PYTHON}"
 echo "Using TORCHRUN=${TORCHRUN}"
 
