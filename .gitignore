@@ -21,10 +21,12 @@ wandb/
 models/
 checkpoints/
 _ref_cache/
-fid_stats/
 sampled_images/
 *.pth
 *.ckpt
+# Filesystem temp files (e.g. dropbox/icloud transient downloads)
+*.[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9].tmp
+checkpoint-*.pth.*
 
 # OS
 .DS_Store

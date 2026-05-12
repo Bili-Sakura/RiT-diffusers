@@ -7,7 +7,7 @@ Usage examples:
         --model RiT-XL/16 --rae_model RAE_DINOv2 --dinov2small \\
         --rae_normalize \\
         --normalization_stat_path stats/RAE_DINOv2_small/normalization_stats.pt \\
-        --reg_loss --reg_loss_weight 0.2 \\
+        --use_cls --cls_loss_weight 0.2 \\
         --pred_type x --P_mean -0.8 --P_std 0.8 \\
         --batch_size 192 --blr 5e-5 --epochs 800 --warmup_epochs 5 \\
         --output_dir output/rit_xl_dinov2s --data_path imagenet/ --online_eval
@@ -16,7 +16,7 @@ Usage examples:
     torchrun --nproc_per_node=8 main.py \\
         --model RiT-XL/16 --rae_model RAE_DINOv2 --dinov2small --rae_normalize \\
         --normalization_stat_path stats/RAE_DINOv2_small/normalization_stats.pt \\
-        --reg_loss --reg_loss_weight 0.2 --pred_type x \\
+        --use_cls --cls_loss_weight 0.2 --pred_type x \\
         --gen_bsz 4096 --num_images 50000 \\
         --num_sampling_steps 25 --sampling_method heun --sample_schedule time_shift \\
         --cfg 3.7 --interval_min 0.1 --interval_max 0.98 \\
@@ -44,7 +44,6 @@ from denoiser import Denoiser
 from engine import evaluate, train_one_epoch
 from rae import RAE_models
 from util.crop import center_crop_arr
-from util.muon import split_params_for_muon
 
 
 def get_args_parser():
@@ -64,9 +63,9 @@ def get_args_parser():
                         help='RAE encoder variant (currently only RAE_DINOv2)')
     parser.add_argument('--dinov2small', action='store_true', default=False,
                         help='Use DINOv2-Small (d=384); default is DINOv2-Base (d=768)')
-    parser.add_argument('--reg_loss', action='store_true',
+    parser.add_argument('--use_cls', action='store_true',
                         help='Enable joint [CLS]-patch modeling (paper §3.2)')
-    parser.add_argument('--reg_loss_weight', type=float, default=0.2,
+    parser.add_argument('--cls_loss_weight', type=float, default=0.2,
                         help='Weight lambda on the [CLS] auxiliary loss')
     parser.add_argument('--rae_normalize', action='store_true',
                         help='Element-wise standardize DINOv2 features (paper §3.1)')
@@ -86,10 +85,6 @@ def get_args_parser():
     parser.add_argument('--lr_schedule', type=str, default='constant',
                         choices=['constant', 'cosine'])
     parser.add_argument('--weight_decay', type=float, default=0.0)
-    parser.add_argument('--optimizer', default='adamw', choices=['adamw', 'muon'])
-    parser.add_argument('--muon_lr', type=float, default=0.001)
-    parser.add_argument('--muon_momentum', type=float, default=0.95)
-    parser.add_argument('--muon_weight_decay', type=float, default=0.1)
     parser.add_argument('--ema_decay1', type=float, default=0.9999,
                         help='EMA decay used for sampling')
     parser.add_argument('--ema_decay2', type=float, default=0.9996,
@@ -260,23 +255,9 @@ def main(args):
     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
     model_without_ddp = model.module
 
-    if args.optimizer == 'muon':
-        muon_params, adamw_params = split_params_for_muon(model_without_ddp)
-        optimizer_adamw = torch.optim.AdamW(
-            [{'params': adamw_params, 'weight_decay': 0.0}],
-            lr=args.lr, betas=(0.9, 0.95),
-        )
-        optimizer_muon = torch.optim.Muon(
-            muon_params, lr=args.muon_lr,
-            momentum=args.muon_momentum, weight_decay=args.muon_weight_decay,
-        )
-        optimizer = [optimizer_adamw, optimizer_muon]
-        print(optimizer_adamw)
-        print(optimizer_muon)
-    else:
-        param_groups = misc.add_weight_decay(model_without_ddp, args.weight_decay)
-        optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
-        print(optimizer)
+    param_groups = misc.add_weight_decay(model_without_ddp, args.weight_decay)
+    optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
+    print(optimizer)
 
     # Resume from checkpoint if provided
     checkpoint_path = (
@@ -294,11 +275,7 @@ def main(args):
         print("Resumed checkpoint from", checkpoint_path)
 
         if 'optimizer' in checkpoint and 'epoch' in checkpoint:
-            if isinstance(optimizer, list):
-                for opt, state in zip(optimizer, checkpoint['optimizer']):
-                    opt.load_state_dict(state)
-            else:
-                optimizer.load_state_dict(checkpoint['optimizer'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
             args.start_epoch = checkpoint['epoch'] + 1
             print("Loaded optimizer & scaler state!")
         del checkpoint

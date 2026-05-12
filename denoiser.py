@@ -12,7 +12,7 @@ Key design choices:
     high-noise end to compensate for the per-token dimensionality.
   - Joint [CLS]-patch modeling: the [CLS] token is noised along the same
     flow-matching path, prepended to the patch sequence, and predicted by a
-    separate linear head with its own loss weight (reg_loss_weight).
+    separate linear head with its own loss weight (cls_loss_weight).
 """
 import math
 
@@ -127,14 +127,14 @@ class Denoiser(nn.Module):
             num_classes=args.class_num,
             attn_drop=args.attn_dropout,
             proj_drop=args.proj_dropout,
-            reg_loss=args.reg_loss,
+            use_cls=args.use_cls,
             in_channels=latent_dim,
         )
         self.img_size = args.rae_input_size
         self.latent_channels = latent_dim
         self.num_classes = args.class_num
-        self.reg_loss = args.reg_loss
-        self.reg_loss_weight = args.reg_loss_weight
+        self.use_cls = args.use_cls
+        self.cls_loss_weight = args.cls_loss_weight
         self.label_drop_prob = args.label_drop_prob
         self.P_mean = args.P_mean
         self.P_std = args.P_std
@@ -191,7 +191,7 @@ class Denoiser(nn.Module):
         z = t * x + (1 - t) * e
         v = (x - z) / (1 - t).clamp_min(self.t_eps)
 
-        if self.reg_loss and cls_token is not None:
+        if self.use_cls and cls_token is not None:
             t_cls = t.squeeze(-1).squeeze(-1)
             if self.coupled_noise_train:
                 e_cls = e.mean(dim=(-2, -1))
@@ -213,17 +213,17 @@ class Denoiser(nn.Module):
         loss_fm = ((v - v_pred) ** 2).mean(dim=(1, 2, 3)).mean()
         loss_dict = {'loss_fm': loss_fm}
 
-        if self.reg_loss and cls_token is not None:
+        if self.use_cls and cls_token is not None:
             if self.pred_type == 'x':
                 v_cls_pred = (net_cls_out - z_cls) / (1 - t_cls).clamp_min(self.t_eps)
             else:
                 v_cls_pred = net_cls_out
             loss_cls = ((v_cls - v_cls_pred) ** 2).mean()
-            loss_dict['loss_cls_raw'] = loss_cls
+            loss_dict['loss_cls'] = loss_cls
 
         loss = loss_fm
-        if 'loss_cls_raw' in loss_dict:
-            loss = loss + self.reg_loss_weight * loss_dict['loss_cls_raw']
+        if 'loss_cls' in loss_dict:
+            loss = loss + self.cls_loss_weight * loss_dict['loss_cls']
         loss_dict['loss_total'] = loss
         return loss, loss_dict
 
@@ -232,7 +232,7 @@ class Denoiser(nn.Module):
         device = labels.device
         bsz = labels.size(0)
         z = self.noise_scale * torch.randn(bsz, self.latent_channels, self.img_size, self.img_size, device=device)
-        if self.reg_loss:
+        if self.use_cls:
             if self.coupled_noise:
                 z_cls = z.mean(dim=(-2, -1))
             else:
@@ -261,7 +261,7 @@ class Denoiser(nn.Module):
     @torch.no_grad()
     def _forward_sample(self, z, t, labels, z_cls=None):
         # --- conditional branch ---
-        if self.reg_loss and z_cls is not None:
+        if self.use_cls and z_cls is not None:
             net_out_cond, net_cls_cond = self.net(z, t.flatten(), labels, z_cls=z_cls)
             if self.pred_type == 'x':
                 v_cond = (net_out_cond - z) / (1.0 - t).clamp_min(self.sample_eps)
@@ -281,7 +281,7 @@ class Denoiser(nn.Module):
             return v_cond, v_cls_cond
 
         # --- unconditional branch ---
-        if self.reg_loss and z_cls is not None:
+        if self.use_cls and z_cls is not None:
             net_out_uncond, net_cls_uncond = self.net(z, t.flatten(), torch.full_like(labels, self.num_classes), z_cls=z_cls)
             if self.pred_type == 'x':
                 v_uncond = (net_out_uncond - z) / (1.0 - t).clamp_min(self.sample_eps)
@@ -304,7 +304,7 @@ class Denoiser(nn.Module):
         v_guided = v_uncond + cfg_scale_interval * (v_cond - v_uncond)
 
         # Interval-limited CFG for [CLS] (may differ from patch interval).
-        if self.reg_loss and z_cls is not None:
+        if self.use_cls and z_cls is not None:
             cls_low, cls_high = self.cfg_cls_interval
             cls_interval_mask = (t < cls_high) & ((cls_low == 0) | (t > cls_low))
             cfg_cls_interval = torch.where(cls_interval_mask, self.cfg_cls_scale, 1.0)
@@ -315,7 +315,7 @@ class Denoiser(nn.Module):
 
     @torch.no_grad()
     def _euler_step(self, z, t, t_next, labels, z_cls=None):
-        if self.reg_loss and z_cls is not None:
+        if self.use_cls and z_cls is not None:
             v_pred, v_cls_pred = self._forward_sample(z, t, labels, z_cls=z_cls)
             z_next = z + (t_next - t) * v_pred
             z_cls_next = z_cls + (t_next.squeeze(-1).squeeze(-1) - t.squeeze(-1).squeeze(-1)) * v_cls_pred
@@ -327,7 +327,7 @@ class Denoiser(nn.Module):
 
     @torch.no_grad()
     def _heun_step(self, z, t, t_next, labels, z_cls=None):
-        if self.reg_loss and z_cls is not None:
+        if self.use_cls and z_cls is not None:
             v_pred_t, v_cls_pred_t = self._forward_sample(z, t, labels, z_cls=z_cls)
             z_next_euler = z + (t_next - t) * v_pred_t
             z_cls_next_euler = z_cls + (t_next.squeeze(-1).squeeze(-1) - t.squeeze(-1).squeeze(-1)) * v_cls_pred_t

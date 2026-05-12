@@ -275,7 +275,7 @@ def save_model(args, model_without_ddp, optimizer, epoch, epoch_name=None):
 
     to_save = {
         'model': model_without_ddp.state_dict(),
-        'optimizer': [opt.state_dict() for opt in optimizer] if isinstance(optimizer, list) else optimizer.state_dict(),
+        'optimizer': optimizer.state_dict(),
         'epoch': epoch,
         'args': args,
     }

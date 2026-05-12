@@ -12,7 +12,7 @@ torchrun --nproc_per_node=8 --nnodes=1 main.py \
     --rae_model RAE_DINOv2 --dinov2small \
     --rae_normalize \
     --normalization_stat_path stats/RAE_DINOv2_small/normalization_stats.pt \
-    --reg_loss --reg_loss_weight 0.2 \
+    --use_cls --cls_loss_weight 0.2 \
     --pred_type x \
     --time_schedule shift \
     --P_mean -0.8 --P_std 0.8 \

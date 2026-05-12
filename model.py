@@ -16,7 +16,7 @@ Key components:
   - adaLN modulation for timestep + class conditioning
   - 32 in-context class tokens injected at an intermediate layer (from JiT)
   - optional [CLS] token projection + separate linear head for joint [CLS]-patch
-    modeling (enabled by `reg_loss=True`)
+    modeling (enabled by `use_cls=True`)
 """
 import math
 
@@ -129,16 +129,16 @@ class SwiGLUFFN(nn.Module):
 
 
 class FinalLayer(nn.Module):
-    """Final adaLN-modulated RMSNorm + linear head. When `reg_loss=True`, a
+    """Final adaLN-modulated RMSNorm + linear head. When `use_cls=True`, a
     separate linear head predicts the [CLS] token from its own position in the
     sequence."""
 
-    def __init__(self, hidden_size, patch_size, out_channels, reg_loss=False):
+    def __init__(self, hidden_size, patch_size, out_channels, use_cls=False):
         super().__init__()
-        self.reg_loss = reg_loss
+        self.use_cls = use_cls
         self.norm_final = RMSNorm(hidden_size)
         self.linear = nn.Linear(hidden_size, patch_size * patch_size * out_channels, bias=True)
-        if reg_loss:
+        if use_cls:
             self.linear_cls = nn.Linear(hidden_size, out_channels, bias=True)
         self.adaLN_modulation = nn.Sequential(
             nn.SiLU(),
@@ -148,7 +148,7 @@ class FinalLayer(nn.Module):
     def forward(self, x, c, cls=None):
         shift, scale = self.adaLN_modulation(c).chunk(2, dim=1)
         x = modulate(self.norm_final(x), shift, scale)
-        if not self.reg_loss and cls is None:
+        if not self.use_cls and cls is None:
             return self.linear(x), None
         cls_token = self.linear_cls(x[:, 0]).unsqueeze(1)
         x = self.linear(x[:, 1:])
@@ -191,7 +191,7 @@ class RiT(nn.Module):
         in_context_len, in_context_start: 32 learnable class-conditioned tokens
             injected at `in_context_start` and processed by all subsequent
             layers; discarded before the final projection (from JiT).
-        reg_loss: if True, project the encoder's [CLS] token into the sequence
+        use_cls: if True, project the encoder's [CLS] token into the sequence
             and predict it from its own output position via `linear_cls`. This
             enables the joint [CLS]-patch modeling of RiT §3.2.
     """
@@ -210,7 +210,7 @@ class RiT(nn.Module):
         num_classes: int = 1000,
         in_context_len: int = 32,
         in_context_start: int = 8,
-        reg_loss: bool = False,
+        use_cls: bool = False,
     ):
         super().__init__()
         self.in_channels = in_channels
@@ -222,7 +222,7 @@ class RiT(nn.Module):
         self.in_context_len = in_context_len
         self.in_context_start = in_context_start
         self.num_classes = num_classes
-        self.reg_loss = reg_loss
+        self.use_cls = use_cls
 
         self.t_embedder = TimestepEmbedder(hidden_size)
         self.y_embedder = LabelEmbedder(num_classes, hidden_size)
@@ -231,7 +231,7 @@ class RiT(nn.Module):
                                      in_chans=in_channels, embed_dim=hidden_size)
 
         num_patches = self.x_embedder.num_patches
-        if reg_loss:
+        if use_cls:
             # One extra position for the projected [CLS] token prepended to the sequence.
             self.cls_projectors = nn.Linear(in_channels, hidden_size, bias=True)
             num_patches += 1
@@ -245,11 +245,11 @@ class RiT(nn.Module):
         hw_seq_len = input_size // patch_size
         self.feat_rope = VisionRotaryEmbeddingFast(
             dim=half_head_dim, pt_seq_len=hw_seq_len,
-            num_cls_token=(1 if reg_loss else 0),
+            num_cls_token=(1 if use_cls else 0),
         )
         self.feat_rope_incontext = VisionRotaryEmbeddingFast(
             dim=half_head_dim, pt_seq_len=hw_seq_len,
-            num_cls_token=self.in_context_len + (1 if reg_loss else 0),
+            num_cls_token=self.in_context_len + (1 if use_cls else 0),
         )
 
         # Attention & projection dropout is only active in the middle 50% of
@@ -261,7 +261,7 @@ class RiT(nn.Module):
             for i in range(depth)
         ])
 
-        self.final_layer = FinalLayer(hidden_size, patch_size, self.out_channels, reg_loss=reg_loss)
+        self.final_layer = FinalLayer(hidden_size, patch_size, self.out_channels, use_cls=use_cls)
 
         self.initialize_weights()
 
@@ -276,8 +276,8 @@ class RiT(nn.Module):
         pos_embed = get_2d_sincos_pos_embed(
             self.pos_embed.shape[-1],
             int(self.x_embedder.num_patches ** 0.5),
-            cls_token=1 if self.reg_loss else 0,
-            extra_tokens=1 if self.reg_loss else 0,
+            cls_token=1 if self.use_cls else 0,
+            extra_tokens=1 if self.use_cls else 0,
         )
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
 
@@ -318,7 +318,7 @@ class RiT(nn.Module):
         c = t_emb + y_emb
 
         x = self.x_embedder(x)
-        if self.reg_loss and z_cls is not None:
+        if self.use_cls and z_cls is not None:
             z_cls = self.cls_projectors(z_cls).unsqueeze(1)
             x = torch.cat([z_cls, x], dim=1)
         x = x + self.pos_embed
@@ -334,33 +334,12 @@ class RiT(nn.Module):
         x, cls_pred = self.final_layer(x, c, cls=z_cls)
         output = self.unpatchify(x, self.patch_size)
 
-        if self.reg_loss and z_cls is not None:
+        if self.use_cls and z_cls is not None:
             return output, cls_pred
         return output
 
 
 # ----------------------------- Model registry --------------------------------- #
-
-def RiT_S(**kwargs):
-    in_channels = kwargs.pop('in_channels', 384)
-    return RiT(depth=12, hidden_size=384, num_heads=6,
-               in_context_len=32, in_context_start=4,
-               patch_size=1, in_channels=in_channels, **kwargs)
-
-
-def RiT_B(**kwargs):
-    in_channels = kwargs.pop('in_channels', 768)
-    return RiT(depth=12, hidden_size=768, num_heads=12,
-               in_context_len=32, in_context_start=4,
-               patch_size=1, in_channels=in_channels, **kwargs)
-
-
-def RiT_L(**kwargs):
-    in_channels = kwargs.pop('in_channels', 768)
-    return RiT(depth=24, hidden_size=1024, num_heads=16,
-               in_context_len=32, in_context_start=8,
-               patch_size=1, in_channels=in_channels, **kwargs)
-
 
 def RiT_XL(**kwargs):
     in_channels = kwargs.pop('in_channels', 768)
@@ -369,17 +348,6 @@ def RiT_XL(**kwargs):
                patch_size=1, in_channels=in_channels, **kwargs)
 
 
-def RiT_H(**kwargs):
-    in_channels = kwargs.pop('in_channels', 768)
-    return RiT(depth=32, hidden_size=1280, num_heads=16,
-               in_context_len=32, in_context_start=10,
-               patch_size=1, in_channels=in_channels, **kwargs)
-
-
 RiT_models = {
-    'RiT-S/16':  RiT_S,
-    'RiT-B/16':  RiT_B,
-    'RiT-L/16':  RiT_L,
     'RiT-XL/16': RiT_XL,
-    'RiT-H/16':  RiT_H,
 }

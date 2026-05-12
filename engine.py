@@ -34,12 +34,7 @@ def train_one_epoch(model, model_without_ddp, rae_model, data_loader, optimizer,
     header = f'Epoch: [{epoch}]'
     print_freq = 20
 
-    optimizers      = optimizer if isinstance(optimizer, list) else [optimizer]
-    optimizer_adamw = optimizers[0]
-    optimizer_muon  = optimizers[1] if len(optimizers) > 1 else None
-
-    for opt in optimizers:
-        opt.zero_grad()
+    optimizer.zero_grad()
 
     if log_writer is not None:
         print(f'log_dir: {args.output_dir}')
@@ -47,12 +42,7 @@ def train_one_epoch(model, model_without_ddp, rae_model, data_loader, optimizer,
     for data_iter_step, (x, labels) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         progress = data_iter_step / len(data_loader) + epoch
 
-        lr_sched.adjust_learning_rate(optimizer_adamw, progress, args)
-
-        if optimizer_muon is not None:
-            muon_lr = args.muon_lr * min(1.0, progress / max(args.warmup_epochs, 1e-8))
-            for pg in optimizer_muon.param_groups:
-                pg['lr'] = muon_lr
+        lr_sched.adjust_learning_rate(optimizer, progress, args)
 
         x = x.to(device, non_blocking=True).to(torch.float32).div_(255)
 
@@ -67,14 +57,12 @@ def train_one_epoch(model, model_without_ddp, rae_model, data_loader, optimizer,
             print(f"Loss is {loss_value}, stopping training")
             sys.exit(1)
 
-        for opt in optimizers:
-            opt.zero_grad()
+        optimizer.zero_grad()
         loss.backward()
 
         grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
-        for opt in optimizers:
-            opt.step()
+        optimizer.step()
 
         model_without_ddp.update_ema()
 
@@ -84,7 +72,7 @@ def train_one_epoch(model, model_without_ddp, rae_model, data_loader, optimizer,
             if k != "loss_total":
                 metric_logger.update(**{k: v.item()})
 
-        lr = optimizer_adamw.param_groups[0]["lr"]
+        lr = optimizer.param_groups[0]["lr"]
         metric_logger.update(lr=lr)
 
         if data_iter_step % args.log_freq == 0:
@@ -99,8 +87,6 @@ def train_one_epoch(model, model_without_ddp, rae_model, data_loader, optimizer,
                     'train_loss': loss_value_reduce,
                     'epoch_1000x': epoch_1000x,
                 }
-                if optimizer_muon is not None:
-                    log_data['muon_lr'] = optimizer_muon.param_groups[0]["lr"]
                 for k, v in loss_dict_reduced.items():
                     if "loss" in k:
                         log_data[f'train_{k}'] = v.item()
@@ -192,9 +178,9 @@ def evaluate(model_without_ddp, rae_model, args, epoch, batch_size=64, log_write
         torch.distributed.barrier()
 
     if args.img_size == 256:
-        fid_statistics_file = 'fid_stats/adm_in256_stats.npz'
+        fid_statistics_file = 'fid_stats/imagenet256_stats.npz'
     elif args.img_size == 512:
-        fid_statistics_file = 'fid_stats/adm_in512_stats.npz'
+        fid_statistics_file = 'fid_stats/imagenet512_stats.npz'
     else:
         raise NotImplementedError
 
