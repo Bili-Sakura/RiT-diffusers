@@ -146,7 +146,7 @@ for the full command.
 
 ### Evaluate the released checkpoint
 
-The first run downloads `le723z/RiT/checkpoint-740.pth` (RiT-XL, 800 epochs)
+The first run downloads `le723z/RiT/checkpoint-last.pth` (RiT-XL, 800 epochs)
 and the matching RAE decoder automatically — no manual setup:
 
 ```bash

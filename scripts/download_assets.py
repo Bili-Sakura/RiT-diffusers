@@ -37,7 +37,7 @@ ASSETS = {
     ),
     "rit_xl_ckpt": (
         "le723z/RiT",
-        "checkpoint-740.pth",
+        "checkpoint-last.pth",
         "output/rit_xl_dinov2s/checkpoint-last.pth",
     ),
 }
