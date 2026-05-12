@@ -3,10 +3,10 @@
 # RiT: Vanilla Diffusion Transformers Are Enough in Representation Space
 
 [![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b.svg)](https://arxiv.org/) &nbsp;
-[![Code](https://img.shields.io/badge/Code-GitHub-181717.svg)](https://github.com/lezhang7/RiT) &nbsp;
+[![Checkpoint](https://img.shields.io/badge/🤗%20Checkpoint-le723z%2FRiT-FFD21E.svg)](https://huggingface.co/le723z/RiT) &nbsp;
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-**Le Zhang &nbsp;·&nbsp; Ning Mang &nbsp;·&nbsp; Aishwarya Agrawal**
+**[Le Zhang](https://lezhang7.github.io/) &nbsp;·&nbsp; Ning Mang &nbsp;·&nbsp; Aishwarya Agrawal**
 
 <p>
 <a href="https://mila.quebec">Mila — Québec AI Institute, UdeM</a> &nbsp;·&nbsp;
@@ -97,18 +97,20 @@ pip install -r requirements.txt
 ```
 
 The DINOv2-with-Registers encoder is loaded from HuggingFace on first use.
-
-### RAE decoder weights
-
-The frozen ViT decoder that maps DINOv2 features back to pixels is from
-[RAE](https://github.com/bytetriper/RAE). Download from the HF mirror:
+The RiT-XL checkpoint and the matching RAE decoder are also pulled from
+HuggingFace automatically the first time you run `bash scripts/eval.sh`
+(see [Quick start](#quick-start)). To prefetch them manually:
 
 ```bash
-# Requires HF login (`huggingface-cli login`); the repo is public but gated.
-huggingface-cli download nyu-visionx/RAE-collections --local-dir models
+python scripts/download_assets.py            # decoder + RiT-XL ckpt
+python scripts/download_assets.py --assets rae_decoder_base   # also DINOv2-Base decoder
 ```
 
-This populates `models/decoders/dinov2/wReg_{small,base}/ViTXL_n08/model.pt`.
+This populates:
+- `models/decoders/dinov2/wReg_small/ViTXL_n08/model.pt` — RAE decoder, from
+  [`nyu-visionx/RAE-collections`](https://huggingface.co/nyu-visionx/RAE-collections).
+- `output/rit_xl_dinov2s/checkpoint-last.pth` — released RiT-XL weights, from
+  [`le723z/RiT`](https://huggingface.co/le723z/RiT).
 
 ### ImageNet data
 
@@ -142,17 +144,23 @@ OUTPUT_DIR=output/my_run IMAGENET_PATH=/data/imagenet bash scripts/train.sh
 8 GPUs · batch 192/GPU (effective 1536) · 800 epochs. See `scripts/train.sh`
 for the full command.
 
-### Evaluate a checkpoint
+### Evaluate the released checkpoint
+
+The first run downloads `le723z/RiT/checkpoint-740.pth` (RiT-XL, 800 epochs)
+and the matching RAE decoder automatically — no manual setup:
 
 ```bash
 # Guided (CFG=3.7 in [0.1, 0.98]):  FID ~1.14
-CKPT=output/my_run/checkpoint-last.pth CFG=3.7 bash scripts/eval.sh
+bash scripts/eval.sh
 
 # Unguided:                          FID ~1.45
-CKPT=output/my_run/checkpoint-last.pth CFG=1.0 bash scripts/eval.sh
+CFG=1.0 bash scripts/eval.sh
 
 # Few-step:                          10 Heun steps → FID ~1.27 guided
-CKPT=output/my_run/checkpoint-last.pth NUM_STEPS=10 CFG=3.7 bash scripts/eval.sh
+NUM_STEPS=10 bash scripts/eval.sh
+
+# Evaluate your own checkpoint instead of the released one
+CKPT=output/my_run/checkpoint-last.pth bash scripts/eval.sh
 ```
 
 Reports FID / IS / Precision / Recall via [torch-fidelity](https://github.com/LTH14/torch-fidelity).

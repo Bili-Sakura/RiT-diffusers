@@ -7,6 +7,9 @@ set -ex
 OUTPUT_DIR=${OUTPUT_DIR:-output/rit_xl_dinov2s}
 IMAGENET_PATH=${IMAGENET_PATH:-imagenet/}
 
+# Auto-download the RAE decoder weights (used by both training and online eval).
+python scripts/download_assets.py --assets rae_decoder_small
+
 torchrun --nproc_per_node=8 --nnodes=1 main.py \
     --model RiT-XL/16 \
     --rae_model RAE_DINOv2 --dinov2small \

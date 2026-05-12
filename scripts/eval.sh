@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Evaluate a trained RiT-XL checkpoint on ImageNet 256x256.
+# Evaluate the released RiT-XL checkpoint on ImageNet 256x256.
 # Matches the paper's reported numbers: Heun 25 steps, time-shift schedule.
 #   - CFG=1.0:  FID ~1.45
 #   - CFG=3.7 (with CFG interval [0.1, 0.98]):  FID ~1.14
+#
+# On first run, the RiT-XL checkpoint and the matching RAE decoder are
+# downloaded automatically from HuggingFace (le723z/RiT and
+# nyu-visionx/RAE-collections).
 set -ex
 
 CKPT=${CKPT:-output/rit_xl_dinov2s/checkpoint-last.pth}
@@ -10,6 +14,9 @@ OUTPUT_DIR=${OUTPUT_DIR:-output/eval}
 IMAGENET_PATH=${IMAGENET_PATH:-imagenet/}
 CFG=${CFG:-3.7}
 NUM_STEPS=${NUM_STEPS:-25}
+
+# Auto-download RiT-XL checkpoint + RAE decoder if missing.
+python scripts/download_assets.py --assets rae_decoder_small rit_xl_ckpt
 
 torchrun --nproc_per_node=8 main.py \
     --model RiT-XL/16 \
