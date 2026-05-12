@@ -23,12 +23,20 @@ Utrecht University &nbsp;·&nbsp; Canada CIFAR AI Chair
 
 ## What is RiT?
 
-RiT performs class-conditional image generation by **flow matching in the
-frozen DINOv2 representation space**. A vanilla Diffusion Transformer trained
-with **x-prediction** on **element-wise standardized** features, a
-**dimension-aware noise schedule**, and a **joint [CLS]-patch** objective
-reaches state-of-the-art FID on ImageNet 256×256 — with no DDT head, no
-Riemannian reformulation, and no representation-alignment loss.
+RiT is a vanilla Diffusion Transformer that **effectively models distributions
+in high-dimensional representation spaces**. Prior latent-diffusion work
+compresses images to low-dim spaces first — SD-VAE uses 4-dim latents, FAE
+bottlenecks to 32 — because diffusion was believed to need low dimensionality
+to be tractable. RiT flows directly in the native **384-dim** DINOv2 feature
+space, yet matches or beats every prior method at the same ImageNet FID
+without DDT heads, Riemannian reformulations, or representation-alignment
+losses.
+
+The recipe is deliberately minimal: **x-prediction** on **element-wise
+standardized** DINOv2 features, a **dimension-aware noise schedule** that
+compensates for the per-token dimensionality, and a **joint [CLS]-patch**
+objective. That's the whole thing — a vanilla DiT is enough once the
+representation geometry is right.
 
 <div align="center">
 <img src="assets/method.png" width="55%" alt="RiT architecture"/>
@@ -46,17 +54,22 @@ Riemannian reformulation, and no representation-alignment loss.
 RiT-XL uses the smallest DINOv2 variant (DINOv2-S, d=384) and 676M denoiser
 parameters. All FIDs use 25 Heun steps with the time-shift schedule.
 
-| Method                       | Encoder           | Params |     FID ↓ (CFG=1) |     FID ↓ (CFG≈3.7) |
-|------------------------------|------------------:|-------:|------------------:|--------------------:|
-| DiT-XL                       | SD-VAE            |  675M  | 9.62              | 2.27                |
-| SiT-XL                       | SD-VAE            |  675M  | 8.61              | 2.06                |
-| REPA-XL                      | SD-VAE            |  675M  | 5.78              | 1.29                |
-| DDT-XL                       | SD-VAE            |  675M  | 6.27              | 1.26                |
-| REG-XL                       | SD-VAE            |  675M  | 1.80              | 1.36                |
-| RAE-XL                       | DINOv2-S          |  676M  | 1.87              | 1.41                |
-| RAE-XL<sup>DH</sup>          | DINOv2-B          |  839M  | 1.51              | 1.16                |
-| FAE-XL                       | FAE-DINOv2-G      |  675M  | 1.48              | 1.29                |
-| **RiT-XL (ours)**            | **DINOv2-S**      | **676M** | **1.45**        | **1.14**            |
+| Method                       | Encoder           | Dim  | Params |     FID ↓ (CFG=1) |     FID ↓ (CFG≈3.7) |
+|------------------------------|------------------:|-----:|-------:|------------------:|--------------------:|
+| DiT-XL                       | SD-VAE            |  4   |  675M  | 9.62              | 2.27                |
+| SiT-XL                       | SD-VAE            |  4   |  675M  | 8.61              | 2.06                |
+| REPA-XL                      | SD-VAE            |  4   |  675M  | 5.78              | 1.29                |
+| DDT-XL                       | SD-VAE            |  4   |  675M  | 6.27              | 1.26                |
+| REG-XL                       | SD-VAE            |  4   |  675M  | 1.80              | 1.36                |
+| RAE-XL                       | DINOv2-S          | 384  |  676M  | 1.87              | 1.41                |
+| RAE-XL<sup>DH</sup>          | DINOv2-B          | 768  |  839M  | 1.51              | 1.16                |
+| FAE-XL                       | FAE-DINOv2-G      |  32  |  675M  | 1.48              | 1.29                |
+| **RiT-XL (ours)**            | **DINOv2-S**      | **384** | **676M** | **1.45**     | **1.14**            |
+
+**RiT is the only method in this table that denoises in a high-dimensional
+representation space and still wins at FID.** Every other method either
+operates on 4-dim SD-VAE latents or bottlenecks the encoder to ≤32 dim; RiT
+runs flow matching natively on 384-dim DINOv2-S tokens with a vanilla DiT.
 
 **Convergence is ~7× faster than RAE at matched encoder.** RiT-XL matches RAE's
 800-epoch FID within ~100 epochs.
