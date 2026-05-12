@@ -18,8 +18,11 @@ from pathlib import Path
 
 try:
     from huggingface_hub import hf_hub_download
-except ImportError:
-    print("ERROR: huggingface_hub not installed. Run `pip install huggingface_hub`.", file=sys.stderr)
+except ImportError as e:
+    print(f"ERROR: huggingface_hub not importable from {sys.executable}", file=sys.stderr)
+    print(f"  underlying error: {e}", file=sys.stderr)
+    print(f"  fix: `{sys.executable} -m pip install huggingface_hub`", file=sys.stderr)
+    print(f"  or:  PYTHON=/path/to/venv/bin/python bash scripts/eval.sh", file=sys.stderr)
     sys.exit(1)
 
 

@@ -2,15 +2,25 @@
 # Main RiT-XL training recipe: DINOv2-Small encoder + x-prediction +
 # element-wise standardization + dimension-aware time shift + joint [CLS]-patch.
 # Reproduces the paper's FID 1.45 (no CFG) / 1.14 (w/ CFG=3.7).
+#
+# `bash scripts/train.sh` does NOT inherit `conda activate`. Either activate
+# the env first, or pass interpreters explicitly:
+#   PYTHON=/path/to/venv/bin/python TORCHRUN=/path/to/venv/bin/torchrun \
+#       bash scripts/train.sh
 set -ex
 
 OUTPUT_DIR=${OUTPUT_DIR:-output/rit_xl_dinov2s}
 IMAGENET_PATH=${IMAGENET_PATH:-imagenet/}
 
-# Auto-download the RAE decoder weights (used by both training and online eval).
-python scripts/download_assets.py --assets rae_decoder_small
+PYTHON=${PYTHON:-$(command -v python || command -v python3)}
+TORCHRUN=${TORCHRUN:-$(command -v torchrun || echo torchrun)}
+echo "Using PYTHON=${PYTHON}"
+echo "Using TORCHRUN=${TORCHRUN}"
 
-torchrun --nproc_per_node=8 --nnodes=1 main.py \
+# Auto-download the RAE decoder weights (used by both training and online eval).
+"${PYTHON}" scripts/download_assets.py --assets rae_decoder_small
+
+"${TORCHRUN}" --nproc_per_node=8 --nnodes=1 main.py \
     --model RiT-XL/16 \
     --rae_model RAE_DINOv2 --dinov2small \
     --rae_normalize \

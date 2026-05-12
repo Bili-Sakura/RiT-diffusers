@@ -7,6 +7,11 @@
 # On first run, the RiT-XL checkpoint and the matching RAE decoder are
 # downloaded automatically from HuggingFace (le723z/RiT and
 # nyu-visionx/RAE-collections).
+#
+# Tip: `bash scripts/eval.sh` does NOT inherit your shell's `conda activate`
+# state. Either activate the env first, or pass PYTHON / TORCHRUN explicitly:
+#   PYTHON=/path/to/venv/bin/python TORCHRUN=/path/to/venv/bin/torchrun \
+#       bash scripts/eval.sh
 set -ex
 
 CKPT=${CKPT:-output/rit_xl_dinov2s/checkpoint-last.pth}
@@ -15,10 +20,17 @@ IMAGENET_PATH=${IMAGENET_PATH:-imagenet/}
 CFG=${CFG:-3.7}
 NUM_STEPS=${NUM_STEPS:-25}
 
-# Auto-download RiT-XL checkpoint + RAE decoder if missing.
-python scripts/download_assets.py --assets rae_decoder_small rit_xl_ckpt
+# Resolve interpreters: prefer the active venv's python/torchrun, else fall
+# back to whatever is on PATH.
+PYTHON=${PYTHON:-$(command -v python || command -v python3)}
+TORCHRUN=${TORCHRUN:-$(command -v torchrun || echo torchrun)}
+echo "Using PYTHON=${PYTHON}"
+echo "Using TORCHRUN=${TORCHRUN}"
 
-torchrun --nproc_per_node=8 main.py \
+# Auto-download RiT-XL checkpoint + RAE decoder if missing.
+"${PYTHON}" scripts/download_assets.py --assets rae_decoder_small rit_xl_ckpt
+
+"${TORCHRUN}" --nproc_per_node=8 main.py \
     --model RiT-XL/16 \
     --rae_model RAE_DINOv2 --dinov2small \
     --rae_normalize \

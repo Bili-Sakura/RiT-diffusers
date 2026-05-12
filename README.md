@@ -163,6 +163,15 @@ NUM_STEPS=10 bash scripts/eval.sh
 CKPT=output/my_run/checkpoint-last.pth bash scripts/eval.sh
 ```
 
+> **Note.** `bash scripts/eval.sh` runs in a fresh subshell and does **not**
+> inherit `conda activate` from your terminal. If you hit
+> `huggingface_hub not importable`, either activate your environment first or
+> point the script at the right interpreter:
+> ```bash
+> PYTHON=/path/to/venv/bin/python TORCHRUN=/path/to/venv/bin/torchrun \
+>     bash scripts/eval.sh
+> ```
+
 Reports FID / IS / Precision / Recall via [torch-fidelity](https://github.com/LTH14/torch-fidelity).
 
 ### Reconstruction demo
