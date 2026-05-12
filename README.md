@@ -195,7 +195,15 @@ CKPT=output/my_run/checkpoint-last.pth bash scripts/eval.sh
 > bash scripts/train.sh
 > ```
 
-Reports FID / IS / Precision / Recall via [torch-fidelity](https://github.com/LTH14/torch-fidelity).
+Reports FID and Inception Score via [torch-fidelity](https://github.com/LTH14/torch-fidelity)
+using the shipped `fid_stats/imagenet256_stats.npz` (Inception mean/cov on
+ImageNet). To also compute **Precision / Recall** you need the ADM
+reference-image batch (~1.5 GB, downloaded automatically on first use):
+
+```bash
+# Compute FID + IS + Precision + Recall
+COMPUTE_PRC=1 bash scripts/eval.sh
+```
 
 ### Reconstruction demo
 

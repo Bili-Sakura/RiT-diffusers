@@ -214,37 +214,44 @@ def evaluate(model_without_ddp, rae_model, args, epoch, batch_size=64, log_write
         fid = metrics_dict['frechet_inception_distance']
         inception_score = metrics_dict['inception_score_mean']
 
-        print("Computing Precision/Recall...")
-        ref_npz_url = "https://openaipublic.blob.core.windows.net/diffusion/jul-2021/ref_batches/imagenet/256/VIRTUAL_imagenet256_labeled.npz"
-        ref_cache_dir  = os.path.join(os.path.dirname(args.output_dir), '_ref_cache')
-        ref_npz_path   = os.path.join(ref_cache_dir, 'VIRTUAL_imagenet256_labeled.npz')
-        ref_images_dir = os.path.join(ref_cache_dir, 'ref_images')
+        # Precision / Recall is opt-in because it needs the ~1.5 GB ADM
+        # reference-image batch (not just statistics). Enable with
+        # `--compute_prc`. Without it we report P/R as NaN.
+        if args.compute_prc:
+            print("Computing Precision/Recall...")
+            ref_npz_url = "https://openaipublic.blob.core.windows.net/diffusion/jul-2021/ref_batches/imagenet/256/VIRTUAL_imagenet256_labeled.npz"
+            ref_cache_dir  = os.path.join(os.path.dirname(args.output_dir), '_ref_cache')
+            ref_npz_path   = os.path.join(ref_cache_dir, 'VIRTUAL_imagenet256_labeled.npz')
+            ref_images_dir = os.path.join(ref_cache_dir, 'ref_images')
 
-        if not os.path.exists(ref_npz_path):
-            print(f"Downloading reference npz to {ref_npz_path}...")
-            import urllib.request
-            os.makedirs(os.path.dirname(ref_npz_path), exist_ok=True)
-            urllib.request.urlretrieve(ref_npz_url, ref_npz_path)
-            print("Download complete.")
+            if not os.path.exists(ref_npz_path):
+                print(f"Downloading reference npz to {ref_npz_path}...")
+                import urllib.request
+                os.makedirs(os.path.dirname(ref_npz_path), exist_ok=True)
+                urllib.request.urlretrieve(ref_npz_url, ref_npz_path)
+                print("Download complete.")
 
-        os.makedirs(ref_images_dir, exist_ok=True)
-        if len(os.listdir(ref_images_dir)) == 0:
-            print(f"Unpacking {ref_npz_path} to {ref_images_dir}...")
-            data = np.load(ref_npz_path)
-            arr = data['arr_0']
-            for idx in range(arr.shape[0]):
-                img_bgr = arr[idx][:, :, ::-1]
-                cv2.imwrite(os.path.join(ref_images_dir, f'{idx:05d}.png'), img_bgr)
-            print(f"Unpacked {arr.shape[0]} images.")
+            os.makedirs(ref_images_dir, exist_ok=True)
+            if len(os.listdir(ref_images_dir)) == 0:
+                print(f"Unpacking {ref_npz_path} to {ref_images_dir}...")
+                data = np.load(ref_npz_path)
+                arr = data['arr_0']
+                for idx in range(arr.shape[0]):
+                    img_bgr = arr[idx][:, :, ::-1]
+                    cv2.imwrite(os.path.join(ref_images_dir, f'{idx:05d}.png'), img_bgr)
+                print(f"Unpacked {arr.shape[0]} images.")
+            else:
+                print(f"Reference images already unpacked ({len(os.listdir(ref_images_dir))} files).")
+            prc_dict = torch_fidelity.calculate_metrics(
+                input1=ref_images_dir,
+                input2=save_folder,
+                cuda=True, isc=False, fid=False, kid=False, prc=True, verbose=False,
+            )
+            precision = prc_dict['precision']
+            recall    = prc_dict['recall']
         else:
-            print(f"Reference images already unpacked ({len(os.listdir(ref_images_dir))} files).")
-        prc_dict = torch_fidelity.calculate_metrics(
-            input1=ref_images_dir,
-            input2=save_folder,
-            cuda=True, isc=False, fid=False, kid=False, prc=True, verbose=False,
-        )
-        precision = prc_dict['precision']
-        recall    = prc_dict['recall']
+            print("Skipping Precision/Recall (pass --compute_prc to enable).")
+            precision, recall = float('nan'), float('nan')
         _log_metrics(fid, inception_score, precision, recall, model_without_ddp, args, epoch, wandb_on)
 
     torch.distributed.barrier()

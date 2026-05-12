@@ -134,6 +134,10 @@ def get_args_parser():
     parser.add_argument('--online_eval', action='store_true', default=False)
     parser.add_argument('--evaluate_gen', action='store_true',
                         help='Skip training and only evaluate generation')
+    parser.add_argument('--compute_prc', action='store_true',
+                        help='Also compute Precision/Recall (downloads a '
+                             '1.5 GB ADM reference batch on first run; FID/IS '
+                             'alone are computed by default)')
     parser.add_argument('--gen_bsz', type=int, default=256)
     parser.add_argument('--gen_precision', type=str, default='fp32', choices=['fp32', 'bf16'])
     parser.add_argument('--save_image_dir', type=str, default=None)

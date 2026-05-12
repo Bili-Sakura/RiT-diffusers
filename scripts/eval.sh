@@ -19,6 +19,11 @@ OUTPUT_DIR=${OUTPUT_DIR:-output/eval}
 IMAGENET_PATH=${IMAGENET_PATH:-imagenet/}
 CFG=${CFG:-3.7}
 NUM_STEPS=${NUM_STEPS:-25}
+# Set COMPUTE_PRC=1 to additionally compute Precision/Recall. This requires
+# downloading ~1.5 GB of ADM reference images on first use.
+COMPUTE_PRC=${COMPUTE_PRC:-0}
+PRC_FLAG=""
+if [ "${COMPUTE_PRC}" = "1" ]; then PRC_FLAG="--compute_prc"; fi
 
 # wandb is disabled by default — eval is a one-shot run and wandb.init()
 # would otherwise hang on rank 0 while it waits for a login token. To log
@@ -63,4 +68,4 @@ echo "Using TORCHRUN=${TORCHRUN}"
     --coupled_noise \
     --checkpoint_path ${CKPT} \
     --output_dir ${OUTPUT_DIR} \
-    --data_path ${IMAGENET_PATH} --evaluate_gen
+    --data_path ${IMAGENET_PATH} --evaluate_gen ${PRC_FLAG}
