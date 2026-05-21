@@ -1,6 +1,6 @@
 <div align="center">
 
-# RiT: Vanilla Diffusion Transformers Are Enough in Representation Space
+# RiT: Vanilla Diffusion Transformers Suffice in Representation Space
 
 [![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b.svg)](https://arxiv.org/) &nbsp;
 [![Checkpoint](https://img.shields.io/badge/🤗%20Checkpoint-le723z%2FRiT-FFD21E.svg)](https://huggingface.co/le723z/RiT) &nbsp;
@@ -49,6 +49,30 @@ representation geometry is right.
 
 ---
 
+## Why DINOv2 features are favorable for flow matching
+
+Pixels and DINOv2 features sit on manifolds of nearly identical *intrinsic*
+dimensionality (TwoNN gives `d̂ ≈ 33` for both), but DINOv2 embeds that
+manifold far more favorably relative to the `N(0, I)` source of flow matching.
+Measured on 10K ImageNet images:
+
+| Geometric axis                     |   Pixel | SD-VAE | DINOv2 | DINOv2 vs Pixel |
+|------------------------------------|--------:|-------:|-------:|----------------:|
+| Intrinsic dim `d̂` (TwoNN)          |  33.6   | —      |  32.6  | ≈ same          |
+| Effective rank (covariance)        |    45   |    98  |   327  | **7.3× higher** |
+| Cov. condition number `κ(Σ_t=0.9)` | ≈ 2,000 | —      |  ≈ 56  | **35× better**  |
+| Median per-coord. excess kurtosis  |  0.958  | 0.228  | 0.083  | **11.5× lower** |
+| On-manifold interp. MSE            | 0.0136  | —      | 0.0080 | **1.7× lower**  |
+
+SD-VAE is consistently intermediate, so the advantage comes from
+representation-learning objectives, not mere compression. These four axes —
+high effective rank, well-conditioned covariance, near-Gaussian marginals, and
+on-manifold linear interpolants — jointly predict that the noise→data ODE on
+DINOv2 should be smooth and **few-step solvable**, which is exactly what we
+observe empirically (3.6× steeper truncation-error decay than pixel-space JiT).
+
+---
+
 ## Results on ImageNet 256×256
 
 RiT-XL uses the smallest DINOv2 variant (DINOv2-S, d=384) and 676M denoiser
@@ -79,12 +103,12 @@ runs flow matching natively on 384-dim DINOv2-S tokens with a vanilla DiT.
 </div>
 
 **Few-step generation works out of the box** — no distillation, no consistency
-training. With the time-shift schedule:
+training. With the time-shift schedule and coupled noise:
 
 | Heun steps     |  5   | 10   | 25   | 50   |
 |---------------:|-----:|-----:|-----:|-----:|
-| FID (CFG=1.0)  | 2.44 | 1.59 | 1.47 | 1.46 |
-| FID (CFG=3.7)  | 1.99 | 1.27 | 1.15 | 1.15 |
+| FID (CFG=1.0)  | 2.38 | 1.58 | 1.45 | 1.44 |
+| FID (CFG=3.7)  | 1.99 | 1.25 | 1.14 | 1.14 |
 
 <div align="center">
 <img src="assets/nfe_compare.png" width="44%" alt="Few-step FID at matched NFE"/> &nbsp;
@@ -244,7 +268,7 @@ If you find RiT useful, please cite:
 
 ```bibtex
 @article{zhang2025rit,
-  title  = {RiT: Vanilla Diffusion Transformers Are Enough in Representation Space},
+  title  = {RiT: Vanilla Diffusion Transformers Suffice in Representation Space},
   author = {Zhang, Le and Mang, Ning and Agrawal, Aishwarya},
   year   = {2025}
 }
