@@ -2,7 +2,7 @@
 
 # RiT: Vanilla Diffusion Transformers Suffice in Representation Space
 
-[![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b.svg)](https://arxiv.org/) &nbsp;
+[![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b.svg)](https://arxiv.org/pdf/2605.21981) &nbsp;
 [![Checkpoint](https://img.shields.io/badge/🤗%20Checkpoint-le723z%2FRiT-FFD21E.svg)](https://huggingface.co/le723z/RiT) &nbsp;
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
@@ -267,10 +267,11 @@ python sample_rae.py --image demo/pixabay_cat.png --rae_model RAE_DINOv2 --dinov
 If you find RiT useful, please cite:
 
 ```bibtex
-@article{zhang2025rit,
-  title  = {RiT: Vanilla Diffusion Transformers Suffice in Representation Space},
-  author = {Zhang, Le and Mang, Ning and Agrawal, Aishwarya},
-  year   = {2025}
+@article{zhang2026rit,
+  title   = {RiT: Vanilla Diffusion Transformers Suffice in Representation Space},
+  author  = {Zhang, Le and Mang, Ning and Agrawal, Aishwarya},
+  journal = {arXiv preprint arXiv:2605.21981},
+  year    = {2026}
 }
 ```
 
