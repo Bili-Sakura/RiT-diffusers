@@ -109,7 +109,6 @@ We additionally thank the authors of [DiT](https://github.com/facebookresearch/D
 [REPA](https://github.com/sihyun-yu/REPA),
 [REG](https://github.com/Martinser/REG),
 [DDT](https://github.com/MCG-NJU/DDT),
-[FAE](https://github.com/zelaki/eq-vae),
 [DINOv2](https://github.com/facebookresearch/dinov2), and
 [torch-fidelity](https://github.com/toshas/torch-fidelity) for releasing the
 models, tooling, and design choices that this work relies on. Full citations
