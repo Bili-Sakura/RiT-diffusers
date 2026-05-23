@@ -93,5 +93,24 @@ COMPUTE_PRC=1 bash scripts/eval.sh                  # +Precision/Recall (~1.5 GB
 
 ## Acknowledgments
 
-Built on [JiT](https://github.com/LTH14/JiT) (x-prediction flow matching, modernized DiT blocks)
-and [RAE](https://github.com/bytetriper/RAE) (DINOv2 encoder + ViT decoder).
+This codebase builds directly on two prior works:
+
+- **[JiT](https://github.com/LTH14/JiT)** — x-prediction flow matching, the
+  in-context class-token design, and the modernized DiT block (SwiGLU, RMSNorm,
+  QK-norm, RoPE). Our training loop, sampler, and model backbone follow JiT
+  closely.
+- **[RAE](https://github.com/bytetriper/RAE)** — the frozen DINOv2 encoder
+  paired with a ViT decoder for representation-space diffusion. We use the
+  released RAE decoders unchanged.
+
+We additionally thank the authors of [DiT](https://github.com/facebookresearch/DiT),
+[SiT](https://github.com/willisma/SiT),
+[LightningDiT](https://github.com/hustvl/LightningDiT),
+[REPA](https://github.com/sihyun-yu/REPA),
+[REG](https://github.com/Martinser/REG),
+[DDT](https://github.com/MCG-NJU/DDT),
+[FAE](https://github.com/zelaki/eq-vae),
+[DINOv2](https://github.com/facebookresearch/dinov2), and
+[torch-fidelity](https://github.com/toshas/torch-fidelity) for releasing the
+models, tooling, and design choices that this work relies on. Full citations
+and credit are in the paper.
