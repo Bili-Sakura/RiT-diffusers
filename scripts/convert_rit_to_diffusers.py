@@ -25,7 +25,7 @@ except Exception:  # pragma: no cover
     safe_save_file = None
 
 from diffusers.models.autoencoders import AutoencoderRAE, create_rit_autoencoder
-from diffusers.models.autoencoders.autoencoder_rae_presets import RIT_RAE_PRESETS, _load_latent_stats
+from diffusers.models.autoencoders.autoencoder_rae import RIT_RAE_PRESETS, _load_latent_stats
 from diffusers.models.transformers import RiTTransformer2DModel
 from diffusers.schedulers import RiTFlowMatchScheduler
 

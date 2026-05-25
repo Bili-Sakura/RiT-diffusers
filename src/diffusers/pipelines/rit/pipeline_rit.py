@@ -59,7 +59,7 @@ except Exception:  # pragma: no cover
 
 
 from ...models.autoencoders.autoencoder_rae import AutoencoderRAE
-from ...models.autoencoders.autoencoder_rae_presets import create_rit_autoencoder
+from ...models.autoencoders.autoencoder_rae import create_rit_autoencoder
 from ...models.transformers.transformer_rit import RiTTransformer2DModel
 from ...schedulers.scheduling_flow_match_rit import RiTFlowMatchScheduler
 

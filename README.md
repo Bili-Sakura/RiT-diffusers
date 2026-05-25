@@ -15,8 +15,7 @@ This repository mirrors the layout used by [NiT-diffusers](https://github.com/Bi
 ## Package layout
 
 - `src/diffusers/models/transformers/transformer_rit.py` — `RiTTransformer2DModel`
-- `src/diffusers/models/autoencoders/autoencoder_rae_upstream.py` — upstream `AutoencoderRAE` implementation ([Diffusers e39aecff](https://github.com/huggingface/diffusers/blob/e39aecff57ed14d1018529c3de6ec3c34fadb559/src/diffusers/models/autoencoders/autoencoder_rae.py))
-- `src/diffusers/models/autoencoders/autoencoder_rae_presets.py` — RiT presets (`create_rit_autoencoder`) and checkpoint loading
+- `src/diffusers/models/autoencoders/autoencoder_rae.py` — upstream `AutoencoderRAE` loader plus RiT presets (`create_rit_autoencoder`)
 - `src/diffusers/schedulers/scheduling_flow_match_rit.py` — `RiTFlowMatchScheduler` (x-prediction, time-shift, Heun/Euler)
 - `src/diffusers/pipelines/rit/pipeline_rit.py` — `RiTPipeline` with classifier-free guidance
 - `scripts/convert_rit_to_diffusers.py` — convert original RiT checkpoints

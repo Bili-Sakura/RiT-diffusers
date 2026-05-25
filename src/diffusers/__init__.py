@@ -39,7 +39,7 @@ def __getattr__(name: str):
 
         return AutoencoderRAE
     if name == "create_rit_autoencoder":
-        from .models.autoencoders.autoencoder_rae_presets import create_rit_autoencoder
+        from .models.autoencoders.autoencoder_rae import create_rit_autoencoder
 
         return create_rit_autoencoder
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
