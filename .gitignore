@@ -18,7 +18,7 @@ output/
 output_dir/
 outputs/
 wandb/
-models/
+/models/
 checkpoints/
 _ref_cache/
 sampled_images/

@@ -1,84 +1,98 @@
 <div align="center">
 
-# RiT: Vanilla Diffusion Transformers Suffice in Representation Space
+# RiT-diffusers
 
 [![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b.svg)](https://arxiv.org/pdf/2605.21981) &nbsp;
 [![Checkpoint](https://img.shields.io/badge/🤗%20Checkpoint-le723z%2FRiT-FFD21E.svg)](https://huggingface.co/le723z/RiT) &nbsp;
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-**[Le Zhang](https://lezhang7.github.io/) &nbsp;·&nbsp; Ning Mang &nbsp;·&nbsp; Aishwarya Agrawal**
-
-<img src="assets/samples_main.png" width="92%" alt="RiT samples on ImageNet 256x256"/>
+**Diffusers-native integration for [RiT: Vanilla Diffusion Transformers Suffice in Representation Space](https://arxiv.org/pdf/2605.21981).**
 
 </div>
 
-RiT is a vanilla Diffusion Transformer trained directly in the **384-dim
-DINOv2 feature space** — no DDT heads, Riemannian reformulations, or REPA
-losses. The recipe: x-prediction on element-wise standardized features, a
-dimension-aware noise schedule, and a joint [CLS]-patch objective. See the
-[paper](https://arxiv.org/pdf/2605.21981) for the full method and analysis.
+This repository mirrors the layout used by [NiT-diffusers](https://github.com/Bili-Sakura/NiT-diffusers.git): RiT components live under `src/diffusers` as `ModelMixin` / `ConfigMixin` classes, a custom flow-matching scheduler, and a `RiTPipeline` for end-to-end sampling. The legacy standalone training stack (`main.py`, `engine.py`, `denoiser.py`, `util/`, etc.) has been removed.
 
-<div align="center">
-<img src="assets/method.png" width="55%" alt="RiT architecture"/>
-</div>
+## Package layout
 
-## Results on ImageNet 256×256
+- `src/diffusers/models/transformers/transformer_rit.py` — `RiTTransformer2DModel`
+- `src/diffusers/models/autoencoders/autoencoder_rae.py` — upstream `AutoencoderRAE` loader plus RiT presets (`create_rit_autoencoder`)
+- `src/diffusers/schedulers/scheduling_flow_match_rit.py` — `RiTFlowMatchScheduler` (x-prediction, time-shift, Heun/Euler)
+- `src/diffusers/pipelines/rit/pipeline_rit.py` — `RiTPipeline` with classifier-free guidance
+- `scripts/convert_rit_to_diffusers.py` — convert original RiT checkpoints
+- `scripts/sample_rit.py` — sample from a converted pipeline
 
-RiT-XL, 25 Heun steps with the time-shift schedule.
-
-| Method                       | Encoder           | Dim  | Params |     FID ↓ (CFG=1) |     FID ↓ (CFG≈3.7) |
-|------------------------------|------------------:|-----:|-------:|------------------:|--------------------:|
-| DiT-XL                       | SD-VAE            |  4   |  675M  | 9.62              | 2.27                |
-| SiT-XL                       | SD-VAE            |  4   |  675M  | 8.61              | 2.06                |
-| REPA-XL                      | SD-VAE            |  4   |  675M  | 5.78              | 1.29                |
-| DDT-XL                       | SD-VAE            |  4   |  675M  | 6.27              | 1.26                |
-| REG-XL                       | SD-VAE            |  4   |  675M  | 1.80              | 1.36                |
-| RAE-XL                       | DINOv2-S          | 384  |  676M  | 1.87              | 1.41                |
-| RAE-XL<sup>DH</sup>          | DINOv2-B          | 768  |  839M  | 1.51              | 1.16                |
-| FAE-XL                       | FAE-DINOv2-G      |  32  |  675M  | 1.48              | 1.29                |
-| **RiT-XL (ours)**            | **DINOv2-S**      | **384** | **676M** | **1.45**     | **1.14**            |
-
-## Quick start
-
-### Install
+## Install
 
 ```bash
-git clone https://github.com/lezhang7/RiT.git
-cd RiT
-pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 \
-    --index-url https://download.pytorch.org/whl/cu128   # match your CUDA
-pip install -r requirements.txt
+pip install -e .
+# PyTorch must match your CUDA build, e.g.:
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 ```
 
-ImageNet should follow the standard `ImageFolder` layout
-(`imagenet/train/n01440764/*.JPEG`). Normalization stats and Inception FID
-reference stats are already in `stats/` and `fid_stats/`. The DINOv2 encoder,
-RAE decoder, and RiT-XL checkpoint are fetched from HuggingFace on first use;
-to prefetch:
+## Download assets
 
 ```bash
 python scripts/download_assets.py
 ```
 
-### Train
+This fetches the RiT-XL checkpoint and DINOv2-Small RAE decoder weights expected by the conversion script.
+
+## Convert a checkpoint
 
 ```bash
-bash scripts/train.sh
-# override paths if needed:
-OUTPUT_DIR=output/my_run IMAGENET_PATH=/data/imagenet bash scripts/train.sh
+python scripts/convert_rit_to_diffusers.py \
+  --checkpoint output/rit_xl_dinov2s/checkpoint-last.pth \
+  --output rit-xl-diffusers \
+  --model-size rit-xl \
+  --dinov2-small \
+  --rae-normalize \
+  --check-load
 ```
 
-8 GPUs · batch 192/GPU · 800 epochs.
+The output directory contains:
 
-### Evaluate
+```text
+model_index.json
+transformer/config.json
+transformer/diffusion_pytorch_model.safetensors
+scheduler/scheduler_config.json
+autoencoder/config.json
+```
+
+The conversion script writes a full `autoencoder/` folder via `AutoencoderRAE.save_pretrained`, including decoder weights and optional latent statistics.
+
+## Sample
 
 ```bash
-bash scripts/eval.sh                                # CFG=3.7,   FID ~1.14
-CFG=1.0 bash scripts/eval.sh                        # unguided,  FID ~1.45
-NUM_STEPS=10 bash scripts/eval.sh                   # 10 steps,  FID ~1.27
-CKPT=output/my_run/checkpoint-last.pth bash scripts/eval.sh
-COMPUTE_PRC=1 bash scripts/eval.sh                  # +Precision/Recall (~1.5 GB DL)
+PYTHONPATH=src python scripts/sample_rit.py \
+  --model rit-xl-diffusers \
+  --class-label 207 \
+  --num-inference-steps 25 \
+  --guidance-scale 3.7 \
+  --guidance-low 0.0 \
+  --guidance-high 0.87 \
+  --seed 42
 ```
+
+Programmatic usage:
+
+```python
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path("src").resolve()))
+
+from diffusers import RiTPipeline
+import torch
+
+pipe = RiTPipeline.from_pretrained("rit-xl-diffusers", torch_dtype=torch.bfloat16).to("cuda")
+image = pipe(class_labels=207, num_inference_steps=25, guidance_scale=3.7).images[0]
+image.save("sample.png")
+```
+
+## Upstreaming to Diffusers
+
+Copy the files under `src/diffusers` into the matching locations in `huggingface/diffusers` and register the classes in Diffusers' lazy import tables. Module names and save/load artifacts follow Diffusers conventions.
 
 ## Citation
 
@@ -91,24 +105,6 @@ COMPUTE_PRC=1 bash scripts/eval.sh                  # +Precision/Recall (~1.5 GB
 }
 ```
 
-## Acknowledgments
+## License
 
-This codebase builds directly on two prior works:
-
-- **[JiT](https://github.com/LTH14/JiT)** — x-prediction flow matching, the
-  in-context class-token design, and the modernized DiT block (SwiGLU, RMSNorm,
-  QK-norm, RoPE). Our training loop, sampler, and model backbone follow JiT
-  closely.
-- **[RAE](https://github.com/bytetriper/RAE)** — the frozen DINOv2 encoder
-  paired with a ViT decoder for representation-space diffusion. We use the
-  released RAE decoders unchanged.
-
-We additionally thank the authors of [DiT](https://github.com/facebookresearch/DiT),
-[SiT](https://github.com/willisma/SiT),
-[LightningDiT](https://github.com/hustvl/LightningDiT),
-[REPA](https://github.com/sihyun-yu/REPA),
-[REG](https://github.com/Martinser/REG),
-[DINOv2](https://github.com/facebookresearch/dinov2), and
-[torch-fidelity](https://github.com/toshas/torch-fidelity) for releasing the
-models, tooling, and design choices that this work relies on. Full citations
-and credit are in the paper.
+MIT
