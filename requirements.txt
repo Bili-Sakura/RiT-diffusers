@@ -1,5 +1,5 @@
 # Install PyTorch separately to match your CUDA toolkit.
-diffusers>=0.30.1
+diffusers>=0.38.0
 safetensors
 numpy>=1.26.0
 einops==0.8.1

@@ -15,7 +15,8 @@ This repository mirrors the layout used by [NiT-diffusers](https://github.com/Bi
 ## Package layout
 
 - `src/diffusers/models/transformers/transformer_rit.py` — `RiTTransformer2DModel`
-- `src/diffusers/models/autoencoders/autoencoder_rit.py` — `RiTAutoencoderKL` (DINOv2 encoder + ViT-MAE decoder)
+- `src/diffusers/models/autoencoders/autoencoder_rae_upstream.py` — upstream `AutoencoderRAE` implementation ([Diffusers e39aecff](https://github.com/huggingface/diffusers/blob/e39aecff57ed14d1018529c3de6ec3c34fadb559/src/diffusers/models/autoencoders/autoencoder_rae.py))
+- `src/diffusers/models/autoencoders/autoencoder_rae_presets.py` — RiT presets (`create_rit_autoencoder`) and checkpoint loading
 - `src/diffusers/schedulers/scheduling_flow_match_rit.py` — `RiTFlowMatchScheduler` (x-prediction, time-shift, Heun/Euler)
 - `src/diffusers/pipelines/rit/pipeline_rit.py` — `RiTPipeline` with classifier-free guidance
 - `scripts/convert_rit_to_diffusers.py` — convert original RiT checkpoints
@@ -59,7 +60,7 @@ scheduler/scheduler_config.json
 autoencoder/config.json
 ```
 
-Load the autoencoder decoder weights on first pipeline use via the paths in `autoencoder/config.json`, or bundle weights with `RiTAutoencoderKL.save_pretrained` after loading.
+The conversion script writes a full `autoencoder/` folder via `AutoencoderRAE.save_pretrained`, including decoder weights and optional latent statistics.
 
 ## Sample
 

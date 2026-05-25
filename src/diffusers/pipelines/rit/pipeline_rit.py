@@ -58,7 +58,8 @@ except Exception:  # pragma: no cover
         return torch.randn(shape, generator=generator, device=device, dtype=dtype)
 
 
-from ...models.autoencoders.autoencoder_rit import RiTAutoencoderKL
+from ...models.autoencoders.autoencoder_rae import AutoencoderRAE
+from ...models.autoencoders.autoencoder_rae_presets import create_rit_autoencoder
 from ...models.transformers.transformer_rit import RiTTransformer2DModel
 from ...schedulers.scheduling_flow_match_rit import RiTFlowMatchScheduler
 
@@ -78,7 +79,7 @@ class RiTPipeline(DiffusionPipeline):
         self,
         transformer: RiTTransformer2DModel,
         scheduler: RiTFlowMatchScheduler,
-        autoencoder: RiTAutoencoderKL,
+        autoencoder: AutoencoderRAE,
         id2label: Optional[Dict[Union[int, str], str]] = None,
     ):
         super().__init__()
@@ -116,9 +117,12 @@ class RiTPipeline(DiffusionPipeline):
                 scheduler = RiTFlowMatchScheduler()
             autoencoder_path = str(base_path / autoencoder_subfolder) if autoencoder_subfolder else None
             if autoencoder_path is not None:
-                autoencoder = RiTAutoencoderKL.from_pretrained(autoencoder_path, **model_kwargs)
+                try:
+                    autoencoder = AutoencoderRAE.from_pretrained(autoencoder_path, **model_kwargs)
+                except Exception:
+                    autoencoder = create_rit_autoencoder(dinov2_small=True)
             else:
-                autoencoder = RiTAutoencoderKL()
+                autoencoder = create_rit_autoencoder(dinov2_small=True)
             id2label = cls._read_id2label_from_model_index(str(base_path))
             return cls(transformer=transformer, scheduler=scheduler, autoencoder=autoencoder, id2label=id2label)
 
@@ -410,8 +414,8 @@ class RiTPipeline(DiffusionPipeline):
                 return (latents,)
             return RiTPipelineOutput(images=[], latents=latents)
 
-        images = self.autoencoder.decode(latents)
-        images = self.image_processor.postprocess(images, output_type=output_type)
+        decoded = self.autoencoder.decode(latents, return_dict=True).sample
+        images = self.image_processor.postprocess(decoded, output_type=output_type)
         self.maybe_free_model_hooks()
         if not return_dict:
             return (images,)

@@ -1,6 +1,6 @@
 __all__ = [
-    "RiTAutoencoderKL",
-    "RiTAutoencoderOutput",
+    "AutoencoderRAE",
+    "create_rit_autoencoder",
     "RiTTransformer2DModel",
     "RiTTransformer2DModelOutput",
 ]
@@ -13,8 +13,8 @@ def __getattr__(name: str):
         return {"RiTTransformer2DModel": RiTTransformer2DModel, "RiTTransformer2DModelOutput": RiTTransformer2DModelOutput}[
             name
         ]
-    if name in {"RiTAutoencoderKL", "RiTAutoencoderOutput"}:
-        from .autoencoders import RiTAutoencoderKL, RiTAutoencoderOutput
+    if name in {"AutoencoderRAE", "create_rit_autoencoder"}:
+        from .autoencoders import AutoencoderRAE, create_rit_autoencoder
 
-        return {"RiTAutoencoderKL": RiTAutoencoderKL, "RiTAutoencoderOutput": RiTAutoencoderOutput}[name]
+        return {"AutoencoderRAE": AutoencoderRAE, "create_rit_autoencoder": create_rit_autoencoder}[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

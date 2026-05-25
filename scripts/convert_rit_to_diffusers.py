@@ -24,7 +24,8 @@ except Exception:  # pragma: no cover
     safe_load_file = None
     safe_save_file = None
 
-from diffusers.models.autoencoders import RiTAutoencoderKL
+from diffusers.models.autoencoders import AutoencoderRAE, create_rit_autoencoder
+from diffusers.models.autoencoders.autoencoder_rae_presets import RIT_RAE_PRESETS, _load_latent_stats
 from diffusers.models.transformers import RiTTransformer2DModel
 from diffusers.schedulers import RiTFlowMatchScheduler
 
@@ -99,7 +100,7 @@ def _write_model_index(output_dir: Path):
         "_diffusers_version": "0.30.1",
         "scheduler": ["diffusers", "RiTFlowMatchScheduler"],
         "transformer": ["diffusers", "RiTTransformer2DModel"],
-        "autoencoder": ["diffusers", "RiTAutoencoderKL"],
+        "autoencoder": ["diffusers", "AutoencoderRAE"],
     }
     with open(output_dir / "model_index.json", "w", encoding="utf-8") as handle:
         json.dump(model_index, handle, indent=2, sort_keys=True)
@@ -171,35 +172,24 @@ def main():
         filename="scheduler_config.json",
     )
 
-    if args.dinov2_small:
-        encoder_path = "facebook/dinov2-with-registers-small"
-        decoder_config_path = "decoder_config/dinov2_small"
-        default_decoder_path = "models/decoders/dinov2/wReg_small/ViTXL_n08/model.pt"
-        default_norm_path = "stats/RAE_DINOv2_small/normalization_stats.pt"
-    else:
-        encoder_path = "facebook/dinov2-with-registers-base"
-        decoder_config_path = "decoder_config/dinov2_base"
-        default_decoder_path = "models/decoders/dinov2/wReg_base/ViTXL_n08/model.pt"
-        default_norm_path = "stats/RAE_DINOv2_base/normalization_stats.pt"
+    preset = "dinov2_small" if args.dinov2_small else "dinov2_base"
+    stats_path = args.normalization_stat_path
+    if stats_path is None and args.rae_normalize:
+        stats_path = RIT_RAE_PRESETS[preset]["normalization_stat_path"]
 
-    autoencoder_config = {
-        "_class_name": "RiTAutoencoderKL",
-        "encoder_pretrained_model_name_or_path": encoder_path,
-        "encoder_input_size": 224,
-        "normalize_encoder": True,
-        "decoder_config_path": decoder_config_path,
-        "decoder_patch_size": 16,
-        "pretrained_decoder_path": args.decoder_path or default_decoder_path,
-        "reshape_to_2d": True,
-        "rae_normalize": args.rae_normalize,
-        "normalization_stat_path": args.normalization_stat_path or (default_norm_path if args.rae_normalize else None),
-    }
-    _save_config(autoencoder_dir, autoencoder_config)
+    latents_mean, latents_std = _load_latent_stats(stats_path if args.rae_normalize else None)
+    autoencoder = create_rit_autoencoder(
+        preset=preset,
+        rae_normalize=args.rae_normalize,
+        pretrained_decoder_path=args.decoder_path,
+        normalization_stat_path=stats_path,
+    )
+    autoencoder.save_pretrained(autoencoder_dir, safe_serialization=args.safe_serialization)
 
     if args.check_load:
-        autoencoder = RiTAutoencoderKL(**{k: v for k, v in autoencoder_config.items() if k != "_class_name"})
-        decoder_state = torch.load(autoencoder_config["pretrained_decoder_path"], map_location="cpu", weights_only=True)
-        autoencoder.decoder.load_state_dict(decoder_state, strict=False)
+        reloaded = AutoencoderRAE.from_pretrained(autoencoder_dir)
+        if len(list(reloaded.parameters())) != len(list(autoencoder.parameters())):
+            raise SystemExit("Autoencoder reload sanity check failed.")
 
     _write_model_index(output_dir)
     print(f"Saved Diffusers-style RiT pipeline to {output_dir}")
